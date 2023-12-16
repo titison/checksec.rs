@@ -14,34 +14,22 @@ use checksec::pe;
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum BinType {
     #[cfg(feature = "elf")]
-    Elf32,
-    #[cfg(feature = "elf")]
-    Elf64,
+    Elf(u16), //u16 = machine type
     #[cfg(feature = "pe")]
-    PE32,
-    #[cfg(feature = "pe")]
-    PE64,
+    PE(u16), // u16 = machine type
     #[cfg(feature = "macho")]
-    MachO32,
-    #[cfg(feature = "macho")]
-    MachO64,
+    MachO(u32,u32), //u32 = cputype
 }
 #[cfg(not(feature = "color"))]
 impl fmt::Display for BinType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             #[cfg(feature = "elf")]
-            Self::Elf32 => write!(f, "ELF32"),
-            #[cfg(feature = "elf")]
-            Self::Elf64 => write!(f, "ELF64"),
+            Self::Elf(machine_type) => write!(f, "ELF_{}", goblin::elf::header::machine_to_str(machine_type)),
             #[cfg(feature = "pe")]
-            Self::PE32 => write!(f, "PE32"),
-            #[cfg(feature = "pe")]
-            Self::PE64 => write!(f, "PE64"),
+            Self::PE(machine_type) => write!(f, "PE_{}", goblin::pe::header::machine_to_str(machine_type)),
             #[cfg(feature = "macho")]
-            Self::MachO32 => write!(f, "MachO32"),
-            #[cfg(feature = "macho")]
-            Self::MachO64 => write!(f, "MachO64"),
+            Self::MachO(cputype, cpusubtype) => write!(f, "MachO_{}", goblin::mach::constants::cputype::get_arch_name_from_types(cputype, cpusubtype).unwrap_or("UNKNOWN")),
         }
     }
 }
@@ -50,17 +38,11 @@ impl fmt::Display for BinType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             #[cfg(feature = "elf")]
-            Self::Elf32 => write!(f, "{}", "ELF32".bold().underline()),
-            #[cfg(feature = "elf")]
-            Self::Elf64 => write!(f, "{}", "ELF64".bold().underline()),
+            Self::Elf(machine_type) => write!(f, "{}{}", "ELF_".bold().underline(), goblin::elf::header::machine_to_str(machine_type).bold().underline()),
             #[cfg(feature = "pe")]
-            Self::PE32 => write!(f, "{}", "PE32".bold().underline()),
-            #[cfg(feature = "pe")]
-            Self::PE64 => write!(f, "{}", "PE64".bold().underline()),
+            Self::PE(machine_type) => write!(f, "{}{}", "PE_".bold().underline(), goblin::pe::header::machine_to_str(machine_type).bold().underline()),
             #[cfg(feature = "macho")]
-            Self::MachO32 => write!(f, "{}", "MachO32".bold().underline()),
-            #[cfg(feature = "macho")]
-            Self::MachO64 => write!(f, "{}", "MachO64".bold().underline()),
+            Self::MachO(cputype, cpusubtype) => write!(f, "{}{}", "MachO_".bold().underline(), goblin::mach::constants::cputype::get_arch_name_from_types(cputype, cpusubtype).unwrap_or("UNKNOWN").bold().underline()),
         }
     }
 }

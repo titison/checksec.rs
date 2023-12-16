@@ -341,8 +341,8 @@ fn parse_bytes(bytes: &[u8], file: &Path) -> Result<Vec<Binary>, ParseError> {
         #[cfg(feature = "elf")]
         Object::Elf(elf) => {
             let results = elf::CheckSecResults::parse(&elf, bytes);
-            let bin_type =
-                if elf.is_64 { BinType::Elf64 } else { BinType::Elf32 };
+            let machine_type = elf.header.e_machine;
+            let bin_type = BinType::Elf(machine_type);
             Ok(vec![Binary::new(
                 file.to_path_buf(),
                 vec![Blob::new(bin_type, BinSpecificProperties::Elf(results))],
@@ -351,8 +351,8 @@ fn parse_bytes(bytes: &[u8], file: &Path) -> Result<Vec<Binary>, ParseError> {
         #[cfg(feature = "pe")]
         Object::PE(pe) => {
             let results = pe::CheckSecResults::parse(&pe, bytes);
-            let bin_type =
-                if pe.is_64 { BinType::PE64 } else { BinType::PE32 };
+            let machine_type = pe.header.coff_header.machine;
+            let bin_type = BinType::PE(machine_type);
             Ok(vec![Binary::new(
                 file.to_path_buf(),
                 vec![Blob::new(bin_type, BinSpecificProperties::PE(results))],
@@ -363,11 +363,9 @@ fn parse_bytes(bytes: &[u8], file: &Path) -> Result<Vec<Binary>, ParseError> {
             match mach {
                 Mach::Binary(macho) => {
                     let results = macho::CheckSecResults::parse(&macho);
-                    let bin_type = if macho.is_64 {
-                        BinType::MachO64
-                    } else {
-                        BinType::MachO32
-                    };
+                    let cputype = macho.header.cputype();
+                    let cpusubtype = macho.header.cpusubtype();
+                    let bin_type = BinType::MachO(cputype, cpusubtype);
                     Ok(vec![Binary::new(
                         file.to_path_buf(),
                         vec![Blob::new(
@@ -385,11 +383,9 @@ fn parse_bytes(bytes: &[u8], file: &Path) -> Result<Vec<Binary>, ParseError> {
                                 MachO(mach) => {
                                     let results =
                                         macho::CheckSecResults::parse(&mach);
-                                    let bin_type = if mach.is_64 {
-                                        BinType::MachO64
-                                    } else {
-                                        BinType::MachO32
-                                    };
+                                        let cputype = mach.header.cputype();
+                                        let cpusubtype = mach.header.cpusubtype();
+                                        let bin_type = BinType::MachO(cputype, cpusubtype);
                                     fat_blobs.push(Blob::new(
                                         bin_type,
                                         BinSpecificProperties::MachO(results),
@@ -1006,11 +1002,13 @@ fn main() {
             let binary_file_path = Path::new(line.trim());
             if !binary_file_path.is_file() {
                 eprintln!("File {} not found", underline!(line.trim()));
-                process::exit(1);
+                //process::exit(1);
+            } else {
+                if let Ok(mut result) = parse_single_file(binary_file_path, libraries) {
+                    bins.append(&mut result);
+                }
             }
-            if let Ok(mut result) = parse_single_file(binary_file_path, libraries) {
-                bins.append(&mut result);
-            }
+            //println!("{}",bins.len());
             line.clear();
         }
         print_binary_results(&bins, &settings);
